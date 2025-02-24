@@ -82,6 +82,12 @@ class DatabasePlugin extends StoragePlugin {
     }
   }
 
+  addComment (query, comment) {
+    return this.config.appendComment
+      ? `${query} /*${comment}*/`
+      : `/*${comment}*/ ${query}`
+  }
+
   injectDbmQuery (span, query, serviceName, isPreparedStatement = false) {
     const dbmTraceComment = this.createDbmComment(span, serviceName, isPreparedStatement)
 
@@ -89,7 +95,7 @@ class DatabasePlugin extends StoragePlugin {
       return query
     }
 
-    return `/*${dbmTraceComment}*/ ${query}`
+    return this.addComment(query, dbmTraceComment)
   }
 
   maybeTruncate (query) {
