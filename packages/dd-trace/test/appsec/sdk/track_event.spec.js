@@ -5,8 +5,8 @@ const agent = require('../../plugins/agent')
 const axios = require('axios')
 const tracer = require('../../../../../index')
 const { LOGIN_SUCCESS, LOGIN_FAILURE, USER_ID, USER_LOGIN } = require('../../../src/appsec/addresses')
-const { SAMPLING_MECHANISM_APPSEC } = require('../../../src/constants')
 const { USER_KEEP } = require('../../../../../ext/priority')
+const { ASM } = require('../../../src/standalone/product')
 
 describe('track_event', () => {
   describe('Internal API', () => {
@@ -16,8 +16,8 @@ describe('track_event', () => {
     let rootSpan
     let getRootSpan
     let setUserTags
-    let sample
     let waf
+    let telemetry
     let trackUserLoginSuccessEvent, trackUserLoginFailureEvent, trackCustomEvent
 
     beforeEach(() => {
@@ -39,10 +39,12 @@ describe('track_event', () => {
 
       setUserTags = sinon.stub()
 
-      sample = sinon.stub()
-
       waf = {
         run: sinon.spy()
+      }
+
+      telemetry = {
+        incrementSdkEventMetric: sinon.stub()
       }
 
       const trackEvents = proxyquire('../../../src/appsec/sdk/track_event', {
@@ -53,10 +55,8 @@ describe('track_event', () => {
         './set_user': {
           setUserTags
         },
-        '../standalone': {
-          sample
-        },
-        '../waf': waf
+        '../waf': waf,
+        '../telemetry': telemetry
       })
 
       trackUserLoginSuccessEvent = trackEvents.trackUserLoginSuccessEvent
@@ -76,6 +76,7 @@ describe('track_event', () => {
           .to.have.been.calledWithExactly('[ASM] Invalid user provided to trackUserLoginSuccessEvent')
         expect(setUserTags).to.not.have.been.called
         expect(rootSpan.addTags).to.not.have.been.called
+        expect(telemetry.incrementSdkEventMetric).to.not.have.been.called
       })
 
       it('should log warning when root span is not available', () => {
@@ -86,6 +87,7 @@ describe('track_event', () => {
         expect(log.warn)
           .to.have.been.calledOnceWithExactly('[ASM] Root span not available in trackUserLoginSuccessEvent')
         expect(setUserTags).to.not.have.been.called
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('login_success')
       })
 
       it('should call setUser and addTags with metadata', () => {
@@ -109,8 +111,7 @@ describe('track_event', () => {
             'appsec.events.users.login.success.metakey3': 'metaValue3'
           })
         expect(prioritySampler.setPriority)
-          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, SAMPLING_MECHANISM_APPSEC)
-        expect(sample).to.have.been.calledOnceWithExactly(rootSpan)
+          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, ASM)
         expect(waf.run).to.have.been.calledOnceWithExactly({
           persistent: {
             [LOGIN_SUCCESS]: null,
@@ -118,6 +119,7 @@ describe('track_event', () => {
             [USER_LOGIN]: 'user_id'
           }
         })
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('login_success')
       })
 
       it('should call setUser and addTags without metadata', () => {
@@ -133,8 +135,7 @@ describe('track_event', () => {
           'appsec.events.users.login.success.usr.login': 'user_id'
         })
         expect(prioritySampler.setPriority)
-          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, SAMPLING_MECHANISM_APPSEC)
-        expect(sample).to.have.been.calledOnceWithExactly(rootSpan)
+          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, ASM)
         expect(waf.run).to.have.been.calledOnceWithExactly({
           persistent: {
             [LOGIN_SUCCESS]: null,
@@ -142,6 +143,7 @@ describe('track_event', () => {
             [USER_LOGIN]: 'user_id'
           }
         })
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('login_success')
       })
 
       it('should call waf with user login', () => {
@@ -157,8 +159,7 @@ describe('track_event', () => {
           'appsec.events.users.login.success.usr.login': 'user_login'
         })
         expect(prioritySampler.setPriority)
-          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, SAMPLING_MECHANISM_APPSEC)
-        expect(sample).to.have.been.calledOnceWithExactly(rootSpan)
+          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, ASM)
         expect(waf.run).to.have.been.calledOnceWithExactly({
           persistent: {
             [LOGIN_SUCCESS]: null,
@@ -166,6 +167,7 @@ describe('track_event', () => {
             [USER_LOGIN]: 'user_login'
           }
         })
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('login_success')
       })
     })
 
@@ -181,6 +183,7 @@ describe('track_event', () => {
           .to.have.been.calledWithExactly('[ASM] Invalid userId provided to trackUserLoginFailureEvent')
         expect(setUserTags).to.not.have.been.called
         expect(rootSpan.addTags).to.not.have.been.called
+        expect(telemetry.incrementSdkEventMetric).to.not.have.been.called
       })
 
       it('should log warning when root span is not available', () => {
@@ -191,6 +194,7 @@ describe('track_event', () => {
         expect(log.warn)
           .to.have.been.calledOnceWithExactly('[ASM] Root span not available in %s', 'trackUserLoginFailureEvent')
         expect(setUserTags).to.not.have.been.called
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('login_failure')
       })
 
       it('should call addTags with metadata', () => {
@@ -213,14 +217,14 @@ describe('track_event', () => {
           'appsec.events.users.login.failure.metakey3': 'metaValue3'
         })
         expect(prioritySampler.setPriority)
-          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, SAMPLING_MECHANISM_APPSEC)
-        expect(sample).to.have.been.calledOnceWithExactly(rootSpan)
+          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, ASM)
         expect(waf.run).to.have.been.calledOnceWithExactly({
           persistent: {
             [LOGIN_FAILURE]: null,
             [USER_LOGIN]: 'user_id'
           }
         })
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('login_failure')
       })
 
       it('should send false `usr.exists` property when the user does not exist', () => {
@@ -243,14 +247,14 @@ describe('track_event', () => {
           'appsec.events.users.login.failure.metakey3': 'metaValue3'
         })
         expect(prioritySampler.setPriority)
-          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, SAMPLING_MECHANISM_APPSEC)
-        expect(sample).to.have.been.calledOnceWithExactly(rootSpan)
+          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, ASM)
         expect(waf.run).to.have.been.calledOnceWithExactly({
           persistent: {
             [LOGIN_FAILURE]: null,
             [USER_LOGIN]: 'user_id'
           }
         })
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('login_failure')
       })
 
       it('should call addTags without metadata', () => {
@@ -266,14 +270,14 @@ describe('track_event', () => {
           'appsec.events.users.login.failure.usr.exists': 'true'
         })
         expect(prioritySampler.setPriority)
-          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, SAMPLING_MECHANISM_APPSEC)
-        expect(sample).to.have.been.calledOnceWithExactly(rootSpan)
+          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, ASM)
         expect(waf.run).to.have.been.calledOnceWithExactly({
           persistent: {
             [LOGIN_FAILURE]: null,
             [USER_LOGIN]: 'user_id'
           }
         })
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('login_failure')
       })
     })
 
@@ -289,6 +293,7 @@ describe('track_event', () => {
           .to.have.been.calledWithExactly('[ASM] Invalid eventName provided to trackCustomEvent')
         expect(setUserTags).to.not.have.been.called
         expect(rootSpan.addTags).to.not.have.been.called
+        expect(telemetry.incrementSdkEventMetric).to.not.have.been.called
       })
 
       it('should log warning when root span is not available', () => {
@@ -299,6 +304,7 @@ describe('track_event', () => {
         expect(log.warn)
           .to.have.been.calledOnceWithExactly('[ASM] Root span not available in %s', 'trackCustomEvent')
         expect(setUserTags).to.not.have.been.called
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('custom')
       })
 
       it('should call addTags with metadata', () => {
@@ -316,8 +322,8 @@ describe('track_event', () => {
           'appsec.events.custom_event.metakey2': 'metaValue2'
         })
         expect(prioritySampler.setPriority)
-          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, SAMPLING_MECHANISM_APPSEC)
-        expect(sample).to.have.been.calledOnceWithExactly(rootSpan)
+          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, ASM)
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('custom')
       })
 
       it('should call addTags without metadata', () => {
@@ -330,8 +336,8 @@ describe('track_event', () => {
           '_dd.appsec.events.custom_event.sdk': 'true'
         })
         expect(prioritySampler.setPriority)
-          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, SAMPLING_MECHANISM_APPSEC)
-        expect(sample).to.have.been.calledOnceWithExactly(rootSpan)
+          .to.have.been.calledOnceWithExactly(rootSpan, USER_KEEP, ASM)
+        expect(telemetry.incrementSdkEventMetric).to.have.been.calledWith('custom')
       })
     })
   })

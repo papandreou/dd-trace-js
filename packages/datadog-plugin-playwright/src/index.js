@@ -19,7 +19,11 @@ const {
   TEST_RETRY_REASON,
   TEST_MANAGEMENT_IS_QUARANTINED,
   TEST_MANAGEMENT_ENABLED,
-  TEST_BROWSER_NAME
+  TEST_BROWSER_NAME,
+  TEST_MANAGEMENT_IS_DISABLED,
+  TEST_MANAGEMENT_IS_ATTEMPT_TO_FIX,
+  TEST_HAS_FAILED_ALL_RETRIES,
+  TEST_MANAGEMENT_ATTEMPT_TO_FIX_PASSED
 } = require('../../dd-trace/src/plugins/util/test')
 const { RESOURCE_NAME } = require('../../../ext/tags')
 const { COMPONENT } = require('../../dd-trace/src/constants')
@@ -44,7 +48,7 @@ class PlaywrightPlugin extends CiPlugin {
     this.addSub('ci:playwright:session:finish', ({
       status,
       isEarlyFlakeDetectionEnabled,
-      isQuarantinedTestsEnabled,
+      isTestManagementTestsEnabled,
       onDone
     }) => {
       this.testModuleSpan.setTag(TEST_STATUS, status)
@@ -64,7 +68,7 @@ class PlaywrightPlugin extends CiPlugin {
         this.testSessionSpan.setTag('error', error)
       }
 
-      if (isQuarantinedTestsEnabled) {
+      if (isTestManagementTestsEnabled) {
         this.testSessionSpan.setTag(TEST_MANAGEMENT_ENABLED, 'true')
       }
 
@@ -73,7 +77,10 @@ class PlaywrightPlugin extends CiPlugin {
       this.testSessionSpan.finish()
       this.telemetry.ciVisEvent(TELEMETRY_EVENT_FINISHED, 'session')
       finishAllTraceSpans(this.testSessionSpan)
-      this.telemetry.count(TELEMETRY_TEST_SESSION, { provider: this.ciProviderName })
+      this.telemetry.count(TELEMETRY_TEST_SESSION, {
+        provider: this.ciProviderName,
+        autoInjected: !!process.env.DD_CIVISIBILITY_AUTO_INSTRUMENTATION_PROVIDER
+      })
       appClosingTelemetry()
       this.tracer._exporter.flush(onDone)
       this.numFailedTests = 0
@@ -132,11 +139,21 @@ class PlaywrightPlugin extends CiPlugin {
       this.telemetry.ciVisEvent(TELEMETRY_EVENT_FINISHED, 'suite')
     })
 
-    this.addSub('ci:playwright:test:start', ({ testName, testSuiteAbsolutePath, testSourceLine, browserName }) => {
+    this.addSub('ci:playwright:test:start', ({
+      testName,
+      testSuiteAbsolutePath,
+      testSourceLine,
+      browserName,
+      isDisabled
+    }) => {
       const store = storage('legacy').getStore()
       const testSuite = getTestSuitePath(testSuiteAbsolutePath, this.rootDir)
       const testSourceFile = getTestSuitePath(testSuiteAbsolutePath, this.repositoryRoot)
       const span = this.startTestSpan(testName, testSuite, testSourceFile, testSourceLine, browserName)
+
+      if (isDisabled) {
+        span.setTag(TEST_MANAGEMENT_IS_DISABLED, 'true')
+      }
 
       this.enter(span, store)
     })
@@ -148,7 +165,11 @@ class PlaywrightPlugin extends CiPlugin {
       isNew,
       isEfdRetry,
       isRetry,
-      isQuarantined
+      isAttemptToFix,
+      isQuarantined,
+      isAttemptToFixRetry,
+      hasFailedAllRetries,
+      hasPassedAttemptToFixRetries
     }) => {
       const store = storage('legacy').getStore()
       const span = store && store.span
@@ -171,6 +192,19 @@ class PlaywrightPlugin extends CiPlugin {
       }
       if (isRetry) {
         span.setTag(TEST_IS_RETRY, 'true')
+      }
+      if (hasFailedAllRetries) {
+        span.setTag(TEST_HAS_FAILED_ALL_RETRIES, 'true')
+      }
+      if (isAttemptToFix) {
+        span.setTag(TEST_MANAGEMENT_IS_ATTEMPT_TO_FIX, 'true')
+      }
+      if (isAttemptToFixRetry) {
+        span.setTag(TEST_IS_RETRY, 'true')
+        span.setTag(TEST_RETRY_REASON, 'attempt_to_fix')
+      }
+      if (hasPassedAttemptToFixRetries) {
+        span.setTag(TEST_MANAGEMENT_ATTEMPT_TO_FIX_PASSED, 'true')
       }
       if (isQuarantined) {
         span.setTag(TEST_MANAGEMENT_IS_QUARANTINED, 'true')

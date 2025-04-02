@@ -39,6 +39,7 @@ let promise: Promise<void>;
 
 ddTrace.init();
 tracer.init({
+  apmTracingEnabled: false,
   logInjection: true,
   startupLogs: false,
   env: 'test',
@@ -311,6 +312,7 @@ tracer.use('fetch');
 tracer.use('fetch', httpClientOptions);
 tracer.use('generic-pool');
 tracer.use('google-cloud-pubsub');
+tracer.use('google-cloud-vertexai');
 tracer.use('graphql');
 tracer.use('graphql', graphqlOptions);
 tracer.use('graphql', { variables: ['foo', 'bar'] });

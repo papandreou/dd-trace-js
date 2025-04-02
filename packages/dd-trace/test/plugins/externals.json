@@ -113,6 +113,12 @@
       "versions": ["1.20.1"]
     }
   ],
+  "express-session": [
+    {
+      "name": "express",
+      "versions": [">=4.0.0"]
+    }
+  ],
   "mquery": [
     {
       "name": "mquery",
@@ -282,6 +288,14 @@
   "langchain": [
     {
       "name": "@langchain/anthropic",
+      "versions": [">=0.1"]
+    },
+    {
+      "name": "@langchain/google-genai",
+      "versions": [">=0.1"]
+    },
+    {
+      "name": "@langchain/openai",
       "versions": [">=0.1"]
     },
     {

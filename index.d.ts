@@ -165,6 +165,7 @@ interface Plugins {
   "fetch": tracer.plugins.fetch;
   "generic-pool": tracer.plugins.generic_pool;
   "google-cloud-pubsub": tracer.plugins.google_cloud_pubsub;
+  "google-cloud-vertexai": tracer.plugins.google_cloud_vertexai;
   "graphql": tracer.plugins.graphql;
   "grpc": tracer.plugins.grpc;
   "hapi": tracer.plugins.hapi;
@@ -345,6 +346,12 @@ declare namespace tracer {
    * List of options available to the tracer.
    */
   export interface TracerOptions {
+    /**
+     * Used to disable APM Tracing when using standalone products
+     * @default true
+     */
+    apmTracingEnabled?: boolean
+
     /**
      * Whether to enable trace ID injection in log records to be able to correlate
      * traces with logs.
@@ -528,6 +535,9 @@ declare namespace tracer {
       appsec?: {
         /**
          * Configuration of Standalone ASM mode
+         * Deprecated in favor of `apmTracingEnabled`.
+         *
+         * @deprecated
          */
         standalone?: {
           /**
@@ -819,43 +829,43 @@ declare namespace tracer {
   export interface DogStatsD {
     /**
      * Increments a metric by the specified value, optionally specifying tags.
-     * @param {string} stat The dot-separated metric name.
-     * @param {number} value The amount to increment the stat by.
-     * @param {[tag:string]:string|number} tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
+     * @param stat The dot-separated metric name.
+     * @param value The amount to increment the stat by.
+     * @param tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
      */
-    increment(stat: string, value?: number, tags?: { [tag: string]: string|number }): void
+    increment(stat: string, value?: number, tags?: Record<string, string|number>): void
 
     /**
      * Decrements a metric by the specified value, optionally specifying tags.
-     * @param {string} stat The dot-separated metric name.
-     * @param {number} value The amount to decrement the stat by.
-     * @param {[tag:string]:string|number} tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
+     * @param stat The dot-separated metric name.
+     * @param value The amount to decrement the stat by.
+     * @param tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
      */
-    decrement(stat: string, value?: number, tags?: { [tag: string]: string|number }): void
+    decrement(stat: string, value?: number, tags?: Record<string, string|number>): void
 
     /**
      * Sets a distribution value, optionally specifying tags.
-     * @param {string} stat The dot-separated metric name.
-     * @param {number} value The amount to increment the stat by.
-     * @param {[tag:string]:string|number} tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
+     * @param stat The dot-separated metric name.
+     * @param value The amount to increment the stat by.
+     * @param tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
      */
-    distribution(stat: string, value?: number, tags?: { [tag: string]: string|number }): void
+    distribution(stat: string, value?: number, tags?: Record<string, string|number>): void
 
     /**
      * Sets a gauge value, optionally specifying tags.
-     * @param {string} stat The dot-separated metric name.
-     * @param {number} value The amount to increment the stat by.
-     * @param {[tag:string]:string|number} tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
+     * @param stat The dot-separated metric name.
+     * @param value The amount to increment the stat by.
+     * @param tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
      */
-    gauge(stat: string, value?: number, tags?: { [tag: string]: string|number }): void
+    gauge(stat: string, value?: number, tags?: Record<string, string|number>): void
 
     /**
      * Sets a histogram value, optionally specifying tags.
-     * @param {string} stat The dot-separated metric name.
-     * @param {number} value The amount to increment the stat by.
-     * @param {[tag:string]:string|number} tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
+     * @param stat The dot-separated metric name.
+     * @param value The amount to increment the stat by.
+     * @param tags Tags to pass along, such as `{ foo: 'bar' }`. Values are combined with config.tags.
      */
-    histogram(stat: string, value?: number, tags?: { [tag: string]: string|number }): void
+    histogram(stat: string, value?: number, tags?: Record<string, string|number>): void
 
     /**
      * Forces any unsent metrics to be sent
@@ -877,7 +887,7 @@ declare namespace tracer {
 
     /**
      * Links a failed login event to the current trace.
-     * @param {string} userId The user id of the attemped login.
+     * @param {string} userId The user id of the attempted login.
      * @param {boolean} exists If the user id exists.
      * @param {[key: string]: string} metadata Custom fields to link to the login failure event.
      *
@@ -1366,6 +1376,12 @@ declare namespace tracer {
      * [@google-cloud/pubsub](https://github.com/googleapis/nodejs-pubsub) module.
      */
     interface google_cloud_pubsub extends Integration {}
+
+    /**
+     * This plugin automatically instruments the
+     * [@google-cloud/vertexai](https://github.com/googleapis/nodejs-vertexai) module.
+     */
+    interface google_cloud_vertexai extends Integration {}
 
     /** @hidden */
     interface ExecutionArgs {
@@ -2341,7 +2357,7 @@ declare namespace tracer {
        * ```javascript
        * llmobs.trace({ kind: 'llm', name: 'myLLM', modelName: 'gpt-4o', modelProvider: 'openai' }, () => {
        *  llmobs.annotate({
-       *    inputData: [{ content: 'system prompt, role: 'system' }, { content: 'user prompt', role: 'user' }],
+       *    inputData: [{ content: 'system prompt', role: 'system' }, { content: 'user prompt', role: 'user' }],
        *    outputData: { content: 'response', role: 'ai' },
        *    metadata: { temperature: 0.7 },
        *    tags: { host: 'localhost' },
